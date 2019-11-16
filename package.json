@@ -1,6 +1,6 @@
 {
   "name": "level-sugar",
-  "version": "1.0.0",
+  "version": "2.0.0",
   "description": "Syntactic sugar for Level database",
   "main": "index.js",
   "scripts": {
@@ -10,7 +10,6 @@
   "license": "ISC",
   "dependencies": {
     "level": "^5.0.1",
-    "rxjs": "^6.5.2",
     "uuid": "^3.3.2"
   }
 }

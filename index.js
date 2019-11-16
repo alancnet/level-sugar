@@ -1,6 +1,5 @@
 const level = require('level')
 const uuidv1 = require('uuid/v1')
-const { Observable } = require('rxjs')
 
 const wrap = (db, prefix) => {
   const locals = {
@@ -24,51 +23,17 @@ const wrap = (db, prefix) => {
         await db.put(`${prefix}${uuidv1()}`, JSON.stringify(value))
       }
     },
-    get asyncStream() {
-      return Observable.create(observer => {
-        let ended = false
-        const iterator = db.iterator({
-          gt: `${prefix}00000000-0000-0000-0000-000000000000`,
-          lt: `${prefix}ffffffff-ffff-ffff-ffff-ffffffffffff`
-        })
-        const next = () => {
-          if (!ended) iterator.next((err, key, value) => {
-            if (err) return observer.error()
-            if (key === undefined && value === undefined) return observer.complete()
-            observer.next({
-              key: key.substr(prefix.length),
-              value: JSON.parse(value),
-              next
-            })
-          })
-        }
-        next()
-        return () => {
-          iterator.end((err) => {
-            ended = true
-            if (err) observer.error(err)
-            else observer.complete()
-          })
-        }
+    async * [Symbol.asyncIterator](){
+      const iterator = db.iterator({
+        gt: `${prefix}`,
+        lt: `${prefix + String.fromCharCode(65535)}`
       })
-    },
-    get stream() {
-      return Observable.create(observer => {
-        const subscription = this.asyncStream.subscribe(
-          ({key, value, next}) => {
-            next()
-            observer.next({key, value})
-          },
-          err => observer.error(err),
-          () => observer.complete()
-        )
-        return () => subscription.unsubscribe()
-      })
-    },
-    async forEach(cb) {
-      await new Promise((resolve, reject) => {
-        this.asyncStream.subscribe(({key, value, next}) => Promise.resolve(cb(value, key)).then(next), reject, resolve)
-      })
+
+      while (true) {
+        const next = await new Promise((resolve, reject) => iterator.next((err, key, value) => err ? reject(err) : resolve({key, value})))
+        if (next.key === undefined) return
+        yield [next.key.substr(prefix.length), JSON.parse(next.value)]
+      }
     },
     batch(array, ...args) {
       if (array) {
